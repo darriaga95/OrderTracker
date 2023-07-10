@@ -8,33 +8,16 @@ using System.Threading.Tasks;
 
 namespace OrderTracker.src.Model
 {
-    public class LineSpec
-    {
-        public LineSpec(String desc, ushort pos, ushort len) { }
-        public String description { get; set; }
-        public ushort position { get; set; }
-        public ushort length { get; set; }
 
-    }
     public class Orders : Order
     {
 
         private StreamReader OrderStream;
         public List<Order> OrderStack;
 
-        public List<LineSpec> OrderHeader;
-        public List<LineSpec> AddressHeader;
-        public List<LineSpec> DetailHeader;
-
-
-
         public Orders()
         {
-            OrderStack = new List<Order>();
-            AddressHeader = new List<LineSpec>();
-
-          
-            AddressHeader.Add(new LineSpec("Zip", 155, 10));
+            OrderStack = new List<Order>();          
         }
 
         public int AddOrder(Order order) 
@@ -133,6 +116,7 @@ namespace OrderTracker.src.Model
                                 numerror++;
                                 currentOrder.Success = false;
                                 Console.WriteLine("Invalid Order Parameter - " + token);
+                                currentOrder.ErrorMsg = ex.Message;
                             }
 
                             break;
@@ -156,11 +140,12 @@ namespace OrderTracker.src.Model
                                 currentOrder.OrderCustomer.Zip = token;
 
                             }
-                            catch
+                            catch (Exception e)
                             {
                                 numerror++;
                                 currentOrder.Success = false;
                                 Console.WriteLine("Invalid Address Parameter - " + token);
+                                currentOrder.ErrorMsg = e.Message;
                             }
 
                             break;
@@ -195,6 +180,7 @@ namespace OrderTracker.src.Model
                                 currentOrder.Success = false;
                                 Console.WriteLine("Invalid Order Detail Parameter - " + token);
                                 numerror++;
+                                currentOrder.ErrorMsg = ex.Message;
                             }
                             break;
                         default:
