@@ -1,4 +1,5 @@
-﻿using System;
+﻿using OrderTracker.src.Controller;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.Contracts;
@@ -12,19 +13,21 @@ namespace OrderTracker.src.Model
     public class Orders : Order
     {
 
-        private StreamReader OrderStream;
+        public OrderReader orderReader;
+
         public List<Order> OrderStack;
 
-        public Orders()
+        public Orders(OrderReader reader)
         {
-            OrderStack = new List<Order>();          
+            OrderStack = new List<Order>();  
+            orderReader = reader;
         }
 
         public int AddOrder(Order order) 
         {
             try
             {
-                OrderStack.Add(order);
+                
             } catch 
             {
                 return -1;
@@ -35,190 +38,117 @@ namespace OrderTracker.src.Model
 
         public int ParseOrderFile(String path)
         {
-            String line, lti, token ;
+            String line;
             Order currentOrder = null;
-            int numericToken;
-            double decimalToken;
             int numerror = 0, totalerror = 0, numsuccess = 0;
 
-            try
-            {
-                OrderStream = new StreamReader(path);
+            StreamReader OrderStream = new StreamReader(path);
 
-                line = OrderStream.ReadLine();
-                while (line != null)
+                // read through file line-by-line
+                while ((line = OrderStream.ReadLine()) != null)
                 {
 
-                    lti = line.Substring(0, 3);                         
-                    switch (lti)
+                    // switching Line Type Identifier                      
+                    switch (line.Substring(0, 3))
                     {
                         case "100":
-                            token = "";
-                            if (currentOrder != null)
-                            {
-                                AddOrder(currentOrder);
-
-                                if (numerror == 0)
-                                {
-                                    currentOrder.Success = true;
-                                    numsuccess += 1;
-                                    Console.WriteLine("Order number " + currentOrder.orderNumber + " inserted without errors");
-                                }
-                                else
-                                {
-                                    Console.WriteLine("Order number " + currentOrder.orderNumber + " inserted with errors");
-                                    totalerror += numerror;
-                                }
-
-                                numerror = 0;
-                            }
+                            
+                            if (orderReader.isVerbose)
+                                Console.WriteLine("Creating Order...");
 
                             currentOrder = new Order();
-                            try
-                            {
-                                token = line.Substring(3, 10);
-                                numericToken = Convert.ToInt32(token);
-                                currentOrder.orderNumber = numericToken;
 
-                                token = line.Substring(13, 5);
-                                numericToken = Convert.ToInt32(token);
-                                currentOrder.totalItems = numericToken;
+                            if (orderReader.isVerbose)
+                                Console.WriteLine("Parsing Order...");
 
-                                token = line.Substring(18, 10);
-                                decimalToken = Convert.ToDouble(token);
-                                currentOrder.totalCost = decimalToken;
-
-                                token = line.Substring(28, 19);
-                                currentOrder.orderDate = token;
-
-                                token = line.Substring(47, 50);
-                                currentOrder.OrderCustomer.CustomerName = token;
-
-                                token = line.Substring(97, 30);
-                                currentOrder.OrderCustomer.CustomerPhone = token;
-
-                                token = line.Substring(127, 50);
-                                currentOrder.OrderCustomer.CustomerEmail = token;
-
-                                token = line.Substring(177, 1);
-                                numericToken = Convert.ToInt32(token);
-                                currentOrder.isPaid = numericToken;
-
-                                token = line.Substring(178, 1);
-                                currentOrder.isShipped = numericToken;
-
-                                token = line.Substring(179, 1);
-                                currentOrder.isCompleted = numericToken;
-
-                            }
-                            catch (Exception ex)
+                            if (currentOrder.ParseOrder(line) == false)
                             {
                                 numerror++;
-                                currentOrder.Success = false;
-                                Console.WriteLine("Invalid Order Parameter - " + token);
-                                currentOrder.ErrorMsg = ex.Message;
+                                Console.WriteLine("Parse Order error - ");
+                                if (orderReader.isVerbose)
+                                {
+                                    Console.WriteLine(" Error Log - ");
+                                    Console.WriteLine(currentOrder.ErrorMsg + "\n");
+                                }
+                            }
+                            else
+                            {
+                                Console.WriteLine("Parse Order success ");
                             }
 
+                            OrderStack.Add(currentOrder);
+                            if (orderReader.isVerbose)
+                               Console.WriteLine("Adding to Order Stack...");
+
+                            
+                           if (numerror == 0)
+                           {
+                               currentOrder.Success = true;
+                               numsuccess += 1;
+                           }
+                           else
+                           {
+                               Console.WriteLine("Order number " + currentOrder.orderNumber + " inserted with errors");
+                               totalerror += numerror;
+                           }
+
+                           numerror = 0;
+                            
                             break;
                         case "200":
-                            token = String.Empty;
-                            try
+                            if (orderReader.isVerbose)
+                                Console.WriteLine("Parsing Customer Address...");
+
+                            // Parse Address from line
+                            if(currentOrder.OrderCustomer.ParseAddress(line) == false)
                             {
-                                token = line.Substring(3, 50);
-                                currentOrder.OrderCustomer.Addressl1 = token;
+                                numerror += 1;
 
-                                token = line.Substring(53, 50);
-                                currentOrder.OrderCustomer.Addressl2 = token;
-
-                                token = line.Substring(103, 50);
-                                currentOrder.OrderCustomer.City = token;
-
-                                token = line.Substring(153, 2);
-                                currentOrder.OrderCustomer.State = token;
-
-                                token = line.Substring(155, 10);
-                                currentOrder.OrderCustomer.Zip = token;
-
+                                if (orderReader.isVerbose)
+                                {
+                                    Console.WriteLine("Parse Address error - Error Log - ");
+                                    Console.WriteLine(currentOrder.ErrorMsg + "\n");
+                                }
                             }
-                            catch (Exception e)
+                            
+                            if (numerror == 0)
                             {
-                                numerror++;
-                                currentOrder.Success = false;
-                                Console.WriteLine("Invalid Address Parameter - " + token);
-                                currentOrder.ErrorMsg = e.Message;
+                                currentOrder.OrderCustomer.Success = true;
+                                numsuccess += 1;   
                             }
+                            else
+                            {
+                                totalerror += numerror;
+                            }
+
+
 
                             break;
                         case "300":
-                            Item item = new Item();
-                            token = String.Empty;
-                            try
+                            LineItem lineItem = new LineItem();
+                            
+                            if(lineItem.ParseLineItem(line) == false)
                             {
-                                token = line.Substring(3, 2);
-                                numericToken = Convert.ToInt32(token);
-                                item.lineNo = numericToken;
-
-                                token = line.Substring(5, 5);
-                                numericToken = Convert.ToInt32(token);
-                                item.quantity = numericToken;
-
-                                token = line.Substring(10, 10);
-                                decimalToken = Convert.ToDouble(token);
-                                item.costEach = decimalToken;
-
-                                token = line.Substring(20, 10);
-                                decimalToken = Convert.ToDouble(token);
-                                item.costSum = decimalToken;
-
-                                token = line.Substring(30, 50);
-                                item.ItemDescription = token;
-
-                                currentOrder.AddLineItem(item);
+                                numerror += 1;
+                                if (orderReader.isVerbose)
+                                {
+                                    Console.WriteLine("Parse Line Item error - Error Log - ");
+                                    Console.WriteLine(lineItem.ErrorMsg + "\n");
+                                }
                             }
-                            catch (Exception ex) 
-                            {
-                                currentOrder.Success = false;
-                                Console.WriteLine("Invalid Order Detail Parameter - " + token);
-                                numerror++;
-                                currentOrder.ErrorMsg = ex.Message;
-                            }
+
+                            currentOrder.LineItems.Add(lineItem);
+
                             break;
                         default:
                             break;
                     }
 
-                    line = OrderStream.ReadLine();
-                }
-                if (currentOrder != null)
-                {
-                    AddOrder(currentOrder);
-
-                    if (numerror == 0)
-                    {
-                        Console.WriteLine("Order number " + currentOrder.orderNumber + " inserted without errors");
-                        numsuccess += 1;
-                    }
-                    else
-                    {
-                        Console.WriteLine("Order number " + currentOrder.orderNumber + " inserted with errors");
-                        totalerror += numerror;
-                    }
-
-                    numerror = 0;
-                }
+                   
+                }                       
+               
                 OrderStream.Close();
-            } catch (IOException e) 
-            {
-                Console.WriteLine("Invalid File Handle : " + e);
-            }
-            catch (OutOfMemoryException e) 
-            {
-                Console.WriteLine("Please be gentle : " + e);
-            }
-            catch ( ArgumentOutOfRangeException e)
-            {
-                Console.WriteLine(e.Message);
-            }
+            
 
             Console.WriteLine("Parse Orders Completed - Total Sucessess: " + numsuccess + " Total Failures: " + totalerror);
             

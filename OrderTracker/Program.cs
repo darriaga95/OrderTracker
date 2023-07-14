@@ -20,7 +20,15 @@ namespace OrderTracker
 
             Console.WriteLine("Launching Order Tracker...");
 
-            retVal = orderReader.ExecuteOrderConsole();
+            try
+            {
+                retVal = orderReader.ExecuteOrderConsole();
+            }
+            catch (Exception ex) 
+            {
+                Console.WriteLine("Error: Excveption Encountered");
+            }
+            
         }
 
        
